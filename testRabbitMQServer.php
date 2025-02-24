@@ -8,11 +8,23 @@ require_once('rabbitMQLib.inc');
 ini_set("log_errors", 1);
 ini_set("error_log", "/var/log/database_rabbitmq.log");
 
-function validateLogin($username, $password) {
-    $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
+// Persistent MySQL connection
+function getDatabaseConnection() {
+    static $db = null;
+    if ($db === null) {
+        $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
+        if ($db->connect_errno) {
+            error_log("Database connection failed: " . $db->connect_error);
+            return ["status" => "error", "message" => "Database connection failed: " . $db->connect_error];
+        }
+    }
+    return $db;
+}
 
-    if ($db->connect_errno) {
-        return ["status" => "error", "message" => "Database connection failed: " . $db->connect_error];
+function validateLogin($username, $password) {
+    $db = getDatabaseConnection(); // Reuse the connection
+    if (is_array($db)) {
+        return $db; // If connection failed, return the error
     }
 
     $stmt = $db->prepare("SELECT password FROM users WHERE username = ?");

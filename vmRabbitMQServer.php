@@ -4,28 +4,24 @@ require_once('path.inc');
 require_once('get_host_info.inc');
 require_once('rabbitMQLib.inc');
 
-// Enable logging for debugging
-ini_set("log_errors", 1);
-ini_set("error_log", "/var/log/rabbitmq_errors.log");
-
-// Persistent connection to Database VM
-function getDatabaseClient() {
-    static $dbClient = null;
-    if ($dbClient === null) {
-        error_log("Creating a new connection to Database VM's RabbitMQ" . PHP_EOL);
-        $dbClient = new rabbitMQClient("databaseRabbitMQ.ini", "databaseServer");
-    }
-    return $dbClient;
-}
-
 function forwardToDatabaseVM($request) {
     error_log("Forwarding request to Database VM: " . json_encode($request) . PHP_EOL);
 
-    $dbClient = getDatabaseClient(); // Reuse connection
-    $response = $dbClient->send_request($request);
+    try {
+        // Always create a new connection to avoid stuck connections
+        $dbClient = new rabbitMQClient("databaseRabbitMQ.ini", "databaseServer");
 
-    error_log("Received response from Database VM: " . json_encode($response) . PHP_EOL);
-    return $response;
+        $response = $dbClient->send_request($request);
+
+        // Ensure connection is properly closed after request
+        unset($dbClient);
+        error_log("Received response from Database VM: " . json_encode($response) . PHP_EOL);
+
+        return $response;
+    } catch (Exception $e) {
+        error_log("Error forwarding request to Database VM: " . $e->getMessage() . PHP_EOL);
+        return ["status" => "error", "message" => "Failed to communicate with Database VM"];
+    }
 }
 
 function requestProcessor($request) {
@@ -51,6 +47,5 @@ $server = new rabbitMQServer("testRabbitMQ.ini", "testServer");
 $server->process_requests('requestProcessor');
 exit();
 ?>
-
 
 

@@ -4,19 +4,22 @@ require_once('path.inc');
 require_once('get_host_info.inc');
 require_once('rabbitMQLib.inc');
 
+ini_set("log_errors", 1);
+ini_set("error_log", "/var/log/rabbitmq_errors.log");
+
 function forwardToDatabaseVM($request) {
     error_log("Forwarding request to Database VM: " . json_encode($request) . PHP_EOL);
 
     try {
-        // Always create a new connection to avoid stuck connections
+        // ✅ Create a new RabbitMQ client per request (NO persistent connections)
         $dbClient = new rabbitMQClient("databaseRabbitMQ.ini", "databaseServer");
 
         $response = $dbClient->send_request($request);
 
-        // Ensure connection is properly closed after request
+        // ✅ Close connection after request to prevent session duplication
         unset($dbClient);
-        error_log("Received response from Database VM: " . json_encode($response) . PHP_EOL);
 
+        error_log("Received response from Database VM: " . json_encode($response) . PHP_EOL);
         return $response;
     } catch (Exception $e) {
         error_log("Error forwarding request to Database VM: " . $e->getMessage() . PHP_EOL);
@@ -25,7 +28,7 @@ function forwardToDatabaseVM($request) {
 }
 
 function requestProcessor($request) {
-    error_log("Received request in RabbitMQ Server: " . json_encode($request) . PHP_EOL);
+    error_log("Received request in RabbitMQ Server VM: " . json_encode($request) . PHP_EOL);
     echo "Received request from Web Server\n";
     print_r($request);
 
@@ -42,10 +45,8 @@ function requestProcessor($request) {
 }
 
 // Start RabbitMQ Server
-echo "RabbitMQ Server is waiting for messages...\n";
+echo "RabbitMQ Server VM is waiting for messages...\n";
 $server = new rabbitMQServer("testRabbitMQ.ini", "testServer");
 $server->process_requests('requestProcessor');
 exit();
 ?>
-
-

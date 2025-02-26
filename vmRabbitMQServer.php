@@ -4,39 +4,42 @@ require_once('path.inc');
 require_once('get_host_info.inc');
 require_once('rabbitMQLib.inc');
 
+// ✅ Log startup
+error_log("[RABBITMQ VM] 🚀 RabbitMQ Broker is running and waiting for messages..." . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
+echo "[RABBITMQ VM] 🚀 RabbitMQ Broker is running and waiting for messages..." . PHP_EOL;
+
 function forwardToDatabaseVM($request) {
-    echo "[RABBITMQ VM] 📤 Forwarding request to Database VM: " . json_encode($request) . PHP_EOL;
-    error_log("[RABBITMQ VM] 📤 Forwarding request to Database VM: " . json_encode($request), 3, "/var/log/rabbitmq_errors.log");
+    error_log("[RABBITMQ VM] 📤 Forwarding request to Database VM Queue: " . json_encode($request) . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
+
+    $dbClient = null;
 
     try {
-        // ✅ Create a new RabbitMQ Client for every request
-        echo "[RABBITMQ VM] 🔴 Creating NEW connection to Database VM..." . PHP_EOL;
-        error_log("[RABBITMQ VM] 🔴 Creating NEW connection to Database VM...", 3, "/var/log/rabbitmq_errors.log");
-
+        // ✅ Open a temporary connection per request
+        error_log("[RABBITMQ VM] 🔴 Establishing temporary RabbitMQ connection to Database VM Queue..." . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
         $dbClient = new rabbitMQClient("databaseRabbitMQ.ini", "databaseQueue");
-        
-        // ✅ Send request to Database VM
-        $response = $dbClient->send_request($request);
-        
-        echo "[RABBITMQ VM] 📬 Received response from Database VM: " . json_encode($response) . PHP_EOL;
-        error_log("[RABBITMQ VM] 📬 Received response from Database VM: " . json_encode($response), 3, "/var/log/rabbitmq_errors.log");
 
-        // ✅ Close connection after request is completed
-        unset($dbClient);
-        echo "[RABBITMQ VM] 🔴 Connection to Database VM CLOSED." . PHP_EOL;
-        error_log("[RABBITMQ VM] 🔴 Connection to Database VM CLOSED.", 3, "/var/log/rabbitmq_errors.log");
+        // ✅ Send request to Database VM Queue and wait for response
+        $response = $dbClient->send_request($request);
+
+        error_log("[RABBITMQ VM] 📬 Received response from Database VM: " . json_encode($response) . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
 
         return $response;
     } catch (Exception $e) {
-        echo "[RABBITMQ VM] ❌ ERROR: Failed to communicate with Database VM - " . $e->getMessage() . PHP_EOL;
-        error_log("[RABBITMQ VM] ❌ ERROR: Failed to communicate with Database VM - " . $e->getMessage(), 3, "/var/log/rabbitmq_errors.log");
+        error_log("[RABBITMQ VM] ❌ ERROR: Failed to communicate with Database VM - " . $e->getMessage() . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
         return ["status" => "error", "message" => "Failed to communicate with Database VM"];
+    } finally {
+        // ✅ Force Close Connection
+        if ($dbClient !== null) {
+            error_log("[RABBITMQ VM] 🔴 Closing RabbitMQ connection to Database VM after processing request..." . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
+            $dbClient->disconnect();
+            unset($dbClient);
+        }
     }
 }
 
+// ✅ Process Requests
 function requestProcessor($request) {
-    echo "[RABBITMQ VM] 📩 Processing request: " . json_encode($request) . PHP_EOL;
-    error_log("[RABBITMQ VM] 📩 Processing request: " . json_encode($request), 3, "/var/log/rabbitmq_errors.log");
+    error_log("[RABBITMQ VM] 📩 Processing request: " . json_encode($request) . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
 
     if (!isset($request['type'])) {
         return ["status" => "error", "message" => "Unsupported request type"];
@@ -49,11 +52,18 @@ function requestProcessor($request) {
 }
 
 // ✅ Start RabbitMQ Server
-echo "[RABBITMQ VM] 🚀 RabbitMQ Server is waiting for messages..." . PHP_EOL;
-error_log("[RABBITMQ VM] 🚀 RabbitMQ Server is waiting for messages...", 3, "/var/log/rabbitmq_errors.log");
+$server = new rabbitMQServer("testRabbitMQ.ini", "loginQueue");
 
-$server = new rabbitMQServer("testRabbitMQ.ini", "testServer");
-$server->process_requests('requestProcessor');
+try {
+    $server->process_requests('requestProcessor');
+} catch (Exception $e) {
+    error_log("[RABBITMQ VM] ❌ ERROR: Request Processing Failed - " . $e->getMessage() . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
+} finally {
+    // ✅ Force Close RabbitMQ Connection
+    error_log("[RABBITMQ VM] 🔴 FORCE CLOSING RabbitMQ Broker Connection..." . PHP_EOL, 3, "/var/log/rabbitmq_errors.log");
+    $server->disconnect();
+    unset($server);
+}
 exit();
 ?>
 

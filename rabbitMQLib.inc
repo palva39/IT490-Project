@@ -183,9 +183,27 @@ class rabbitMQClient {
         }
     }
     
-    public function getExchange() {
-        return $this->exchangeobj;
+    function consume_response() {
+    try {
+        $this->connect();
+
+        echo "[RABBITMQ CLIENT] 📩 Waiting for response from queue: {$this->queue}\n";
+        error_log("[RABBITMQ CLIENT] 📩 Waiting for response from queue: {$this->queue}\n", 3, "/var/log/rabbitmq_errors.log");
+
+        $this->queueObj->consume(function ($msg) {
+            echo "[RABBITMQ CLIENT] 📬 Received message from queue: " . $msg->getBody() . "\n";
+            error_log("[RABBITMQ CLIENT] 📬 Received message from queue: " . $msg->getBody() . "\n", 3, "/var/log/rabbitmq_errors.log");
+
+            $msg->ack();
+            return json_decode($msg->getBody(), true);
+        });
+
+    } catch (Exception $e) {
+        error_log("[RABBITMQ CLIENT] ❌ ERROR: Failed to consume response - " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
+        return ["status" => "error", "message" => "Failed to consume response"];
     }
+}
+
 }
 ?>
 

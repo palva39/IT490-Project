@@ -18,27 +18,34 @@ function requestProcessor($request) {
 
     switch ($request['type']) {
         case "login":
-            return validateLogin($request['username'], $request['password']);
+            $response = validateLogin($request['username'], $request['password']);
+            logAndSendResponse($response);
+            return $response;
         default:
-            return ["status" => "error", "message" => "Unknown request type"];
+            $response = ["status" => "error", "message" => "Unknown request type"];
+            logAndSendResponse($response);
+            return $response;
     }
 }
 
+// ✅ Validate user login credentials
 function validateLogin($username, $password) {
     echo "[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n";
     error_log("[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
 
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
     if ($db->connect_errno) {
-        echo "[DB RABBITMQ] ❌ Database connection failed: " . $db->connect_error . "\n";
-        error_log("[DB RABBITMQ] ❌ Database connection failed: " . $db->connect_error . "\n", 3, "/var/log/database_rabbitmq.log");
+        $errorMsg = "[DB RABBITMQ] ❌ Database connection failed: " . $db->connect_error;
+        echo $errorMsg . "\n";
+        error_log($errorMsg . "\n", 3, "/var/log/database_rabbitmq.log");
         return ["status" => "error", "message" => "Database connection failed"];
     }
 
     $stmt = $db->prepare("SELECT password FROM users WHERE username = ?");
     if (!$stmt) {
-        echo "[DB RABBITMQ] ❌ SQL error preparing statement.\n";
-        error_log("[DB RABBITMQ] ❌ SQL error preparing statement.\n", 3, "/var/log/database_rabbitmq.log");
+        $errorMsg = "[DB RABBITMQ] ❌ SQL error preparing statement.";
+        echo $errorMsg . "\n";
+        error_log($errorMsg . "\n", 3, "/var/log/database_rabbitmq.log");
         $db->close();
         return ["status" => "error", "message" => "Database error"];
     }
@@ -48,8 +55,6 @@ function validateLogin($username, $password) {
     $stmt->store_result();
 
     if ($stmt->num_rows === 0) {
-        echo "[DB RABBITMQ] ❌ User not found: " . $username . "\n";
-        error_log("[DB RABBITMQ] ❌ User not found: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
         $stmt->close();
         $db->close();
         return ["status" => "error", "message" => "User not found"];
@@ -60,8 +65,6 @@ function validateLogin($username, $password) {
     $stmt->close();
 
     if (password_verify($password, $hashedPassword)) {
-        echo "[DB RABBITMQ] ✅ Login successful for user: " . $username . "\n";
-        error_log("[DB RABBITMQ] ✅ Login successful for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
         $db->close();
         return [
             "status" => "success",
@@ -70,11 +73,15 @@ function validateLogin($username, $password) {
             "token" => bin2hex(random_bytes(16))
         ];
     } else {
-        echo "[DB RABBITMQ] ❌ Incorrect password for user: " . $username . "\n";
-        error_log("[DB RABBITMQ] ❌ Incorrect password for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
         $db->close();
         return ["status" => "error", "message" => "Incorrect password"];
     }
+}
+
+// ✅ Log and send response back to RabbitMQ Broker
+function logAndSendResponse($response) {
+    echo "[DB RABBITMQ] 📬 Sending response to Broker: " . json_encode($response) . "\n";
+    error_log("[DB RABBITMQ] 📬 Sending response to Broker: " . json_encode($response) . "\n", 3, "/var/log/database_rabbitmq.log");
 }
 
 // ✅ Start RabbitMQ Database Listener

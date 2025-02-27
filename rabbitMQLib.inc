@@ -66,24 +66,16 @@ class rabbitMQServer {
             $response = isset($this->callback) ? call_user_func($this->callback, $payload) : ["status" => "error", "message" => "No callback defined"];
 
             if ($msg->getReplyTo()) {
-                // ✅ Correctly bind the response queue
+                // ✅ Send response to reply queue
                 $reply_queue_name = $msg->getReplyTo();
-                $reply_queue = new AMQPQueue($this->channel);
-                $reply_queue->setName($reply_queue_name);
-                $reply_queue->declare();
-                $reply_queue->bind($this->exchangeObj->getName(), $reply_queue_name);
-
-                // ✅ Publish the response message
                 $this->exchangeObj->publish(
                     json_encode($response),
                     $reply_queue_name,
                     AMQP_NOPARAM,
                     ['correlation_id' => $msg->getCorrelationId()]
                 );
-
                 error_log("[RABBITMQ SERVER] 📬 Sent response to queue: {$reply_queue_name}\n", 3, "/var/log/rabbitmq_errors.log");
             }
-
         } catch (Exception $e) {
             error_log("[RABBITMQ SERVER] ❌ ERROR processing message: " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
         }
@@ -157,47 +149,43 @@ class rabbitMQClient {
         }
     }
 
-function send_request($message) {
-    $uid = uniqid();
-    $json_message = json_encode($message);
+    function send_request($message) {
+        $uid = uniqid();
+        $json_message = json_encode($message);
 
-    try {
-        $this->connect();
-        $reply_queue = $this->queue . "_response";
+        try {
+            $this->connect();
 
-        // ✅ Declare the reply queue (Ensure response is read)
-        $this->queueObj->setName($reply_queue);
-        $this->queueObj->declare();
-        $this->queueObj->bind($this->exchangeObj->getName(), $reply_queue);
+            // ✅ Create and declare response queue dynamically
+            $reply_queue_name = $this->queue . "_response";
+            $reply_queue = new AMQPQueue($this->channel);
+            $reply_queue->setName($reply_queue_name);
+            $reply_queue->declare();
+            $reply_queue->bind($this->exchangeObj->getName(), $reply_queue_name);
 
-        // ✅ Send message
-        $this->exchangeObj->publish(
-            $json_message, 
-            $this->routing_key, 
-            AMQP_NOPARAM, 
-            ['reply_to' => $reply_queue, 'correlation_id' => $uid]
-        );
+            // ✅ Publish the message with `reply_to`
+            $this->exchangeObj->publish(
+                $json_message,
+                $this->routing_key,
+                AMQP_NOPARAM,
+                ['reply_to' => $reply_queue_name, 'correlation_id' => $uid]
+            );
 
-        error_log("[RABBITMQ CLIENT] 📤 Message sent to queue: " . $this->queue . " with reply queue: " . $reply_queue, 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ CLIENT] 📤 Message sent to queue: {$this->queue} with reply queue: {$reply_queue_name}\n", 3, "/var/log/rabbitmq_errors.log");
 
-        // ✅ Wait for response
-        while (true) {
-            $this->queueObj->consume(function ($response) use ($uid) {
-                if ($response->getCorrelationId() === $uid) {
-                    $payload = json_decode($response->getBody(), true);
-                    error_log("[RABBITMQ CLIENT] 📬 Received response from " . $this->queue . "_response: " . json_encode($payload), 3, "/var/log/rabbitmq_errors.log");
-                    return $payload;
-                }
-                return null;
-            }, AMQP_AUTOACK);
+            return "Message Sent";
+
+        } catch (Exception $e) {
+            error_log("[RABBITMQ CLIENT] ❌ Failed to send message: " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
+            return "Failed to send message: " . $e->getMessage();
+        } finally {
+            $this->close();
         }
-
-    } catch (Exception $e) {
-        return "Failed to send message: " . $e->getMessage();
-    } finally {
-        $this->close();
     }
-}
+    
+    public function getExchange() {
+        return $this->exchangeobj;
+    }
 }
 ?>
 

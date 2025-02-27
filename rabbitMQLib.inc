@@ -30,7 +30,7 @@ class rabbitMQServer {
 
     function connect() {
         if ($this->connection === null) {
-            error_log("[RABBITMQ SERVER] 🔴 Establishing NEW Connection...", 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ SERVER] 🔴 Establishing NEW Connection...\n", 3, "/var/log/rabbitmq_errors.log");
             $params = [
                 'host' => $this->BROKER_HOST,
                 'port' => $this->BROKER_PORT,
@@ -50,14 +50,14 @@ class rabbitMQServer {
 
     function close() {
         if ($this->connection !== null) {
-            error_log("[RABBITMQ SERVER] 🔴 Closing Connection...", 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ SERVER] 🔴 Closing Connection...\n", 3, "/var/log/rabbitmq_errors.log");
             $this->connection->disconnect();
             $this->connection = null;
         }
     }
 
     function process_message($msg) {
-        error_log("[RABBITMQ SERVER] 📩 Received message: " . $msg->getBody(), 3, "/var/log/rabbitmq_errors.log");
+        error_log("[RABBITMQ SERVER] 📩 Received message: " . $msg->getBody() . "\n", 3, "/var/log/rabbitmq_errors.log");
 
         $this->queueObj->ack($msg->getDeliveryTag());
 
@@ -66,13 +66,26 @@ class rabbitMQServer {
             $response = isset($this->callback) ? call_user_func($this->callback, $payload) : ["status" => "error", "message" => "No callback defined"];
 
             if ($msg->getReplyTo()) {
-                $reply_key = $this->routing_key . ".response";
-                $this->queueObj->setName($msg->getReplyTo());
-                $this->queueObj->bind($this->exchangeObj->getName(), $reply_key);
-                $this->exchangeObj->publish(json_encode($response), $reply_key, AMQP_NOPARAM, ['correlation_id' => $msg->getCorrelationId()]);
+                // ✅ Correctly bind the response queue
+                $reply_queue_name = $msg->getReplyTo();
+                $reply_queue = new AMQPQueue($this->channel);
+                $reply_queue->setName($reply_queue_name);
+                $reply_queue->declare();
+                $reply_queue->bind($this->exchangeObj->getName(), $reply_queue_name);
+
+                // ✅ Publish the response message
+                $this->exchangeObj->publish(
+                    json_encode($response),
+                    $reply_queue_name,
+                    AMQP_NOPARAM,
+                    ['correlation_id' => $msg->getCorrelationId()]
+                );
+
+                error_log("[RABBITMQ SERVER] 📬 Sent response to queue: {$reply_queue_name}\n", 3, "/var/log/rabbitmq_errors.log");
             }
+
         } catch (Exception $e) {
-            error_log("[RABBITMQ SERVER] ❌ ERROR processing message: " . $e->getMessage(), 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ SERVER] ❌ ERROR processing message: " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
         }
     }
 
@@ -82,7 +95,7 @@ class rabbitMQServer {
             $this->connect();
             $this->queueObj->consume([$this, 'process_message']);
         } catch (Exception $e) {
-            error_log("[RABBITMQ SERVER] ❌ ERROR: Request Processing Failed - " . $e->getMessage(), 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ SERVER] ❌ ERROR: Request Processing Failed - " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
         } finally {
             $this->close();
         }
@@ -118,7 +131,7 @@ class rabbitMQClient {
 
     function connect() {
         if ($this->connection === null) {
-            error_log("[RABBITMQ CLIENT] 🔴 Establishing NEW Connection...", 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ CLIENT] 🔴 Establishing NEW Connection...\n", 3, "/var/log/rabbitmq_errors.log");
             $params = [
                 'host' => $this->BROKER_HOST,
                 'port' => $this->BROKER_PORT,
@@ -138,7 +151,7 @@ class rabbitMQClient {
 
     function close() {
         if ($this->connection !== null) {
-            error_log("[RABBITMQ CLIENT] 🔴 Closing Connection...", 3, "/var/log/rabbitmq_errors.log");
+            error_log("[RABBITMQ CLIENT] 🔴 Closing Connection...\n", 3, "/var/log/rabbitmq_errors.log");
             $this->connection->disconnect();
             $this->connection = null;
         }
@@ -150,19 +163,38 @@ class rabbitMQClient {
 
         try {
             $this->connect();
-            $reply_queue = $this->queue . "_response";
+
+            // ✅ Create and declare response queue dynamically
+            $reply_queue_name = $this->queue . "_response";
+            $reply_queue = new AMQPQueue($this->channel);
+            $reply_queue->setName($reply_queue_name);
+            $reply_queue->declare();
+            $reply_queue->bind($this->exchangeObj->getName(), $reply_queue_name);
+
+            // ✅ Bind the main queue to the exchange
             $this->queueObj->bind($this->exchangeObj->getName(), $this->routing_key);
-            $this->exchangeObj->publish($json_message, $this->routing_key, AMQP_NOPARAM, ['reply_to' => $reply_queue, 'correlation_id' => $uid]);
+
+            // ✅ Publish the message with `reply_to`
+            $this->exchangeObj->publish(
+                $json_message,
+                $this->routing_key,
+                AMQP_NOPARAM,
+                ['reply_to' => $reply_queue_name, 'correlation_id' => $uid]
+            );
+
+            error_log("[RABBITMQ CLIENT] 📤 Message sent to queue: {$this->queue} with reply queue: {$reply_queue_name}\n", 3, "/var/log/rabbitmq_errors.log");
 
             return "Message Sent";
+
         } catch (Exception $e) {
+            error_log("[RABBITMQ CLIENT] ❌ Failed to send message: " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
             return "Failed to send message: " . $e->getMessage();
         } finally {
             $this->close();
         }
     }
 }
-
-
-
 ?>
+
+
+

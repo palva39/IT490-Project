@@ -5,12 +5,12 @@ require_once('get_host_info.inc');
 require_once('rabbitMQLib.inc');
 require_once('mysqlconnect.php');
 
-echo "[DB RABBITMQ] 🚀 Database RabbitMQ Server is starting...\n";
-error_log("[DB RABBITMQ] 🚀 Database RabbitMQ Server is starting...\n", 3, "/var/log/database_rabbitmq.log");
+ini_set("log_errors", 1);
+ini_set("error_log", "/var/log/database_rabbitmq.log");
 
 function requestProcessor($request) {
-    echo "[DB RABBITMQ] 📩 Received request: " . json_encode($request) . "\n";
-    error_log("[DB RABBITMQ] 📩 Received request: " . json_encode($request) . "\n", 3, "/var/log/database_rabbitmq.log");
+    echo "[DB RABBITMQ] 📩 Received request from queue: " . json_encode($request) . "\n";
+    error_log("[DB RABBITMQ] 📩 Received request from queue: " . json_encode($request) . "\n", 3, "/var/log/database_rabbitmq.log");
 
     if (!isset($request['type'])) {
         return ["status" => "error", "message" => "Unsupported request type"];
@@ -70,18 +70,18 @@ function validateLogin($username, $password) {
             "token" => bin2hex(random_bytes(16))
         ];
     } else {
+        echo "[DB RABBITMQ] ❌ Incorrect password for user: " . $username . "\n";
         error_log("[DB RABBITMQ] ❌ Incorrect password for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
         $db->close();
         return ["status" => "error", "message" => "Incorrect password"];
     }
 }
 
-// ✅ Start the Database VM RabbitMQ Listener
+// ✅ Start RabbitMQ Database Listener
 echo "[DB RABBITMQ] 🚀 Database RabbitMQ Listener is waiting for messages...\n";
 error_log("[DB RABBITMQ] 🚀 Database RabbitMQ Listener is waiting for messages...\n", 3, "/var/log/database_rabbitmq.log");
 
 $server = new rabbitMQServer("databaseRabbitMQ.ini", "databaseQueue");
 $server->process_requests('requestProcessor');
-
 exit();
 ?>

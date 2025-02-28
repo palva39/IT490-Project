@@ -45,13 +45,14 @@ function forwardToDatabaseVM($request) {
             return ["status" => "error", "message" => "Invalid response format from Database VM"];
         }
 
-        return $response;
+        return $response;  // ✅ Forward actual response back
     } catch (Exception $e) {
         echo "[RABBITMQ VM] ❌ ERROR: Failed to communicate with Database VM - " . $e->getMessage() . "\n";
         error_log("[RABBITMQ VM] ❌ ERROR: Failed to communicate with Database VM - " . $e->getMessage() . "\n", 3, "/var/log/rabbitmq_errors.log");
         return ["status" => "error", "message" => "Failed to communicate with Database VM"];
     }
 }
+
 
 function requestProcessor($request) {
     echo "[RABBITMQ VM] 📩 Processing request: " . json_encode($request) . "\n";
@@ -86,6 +87,7 @@ $server->process_requests(function($request) {
 
 exit();
 ?>
+
 
 
 

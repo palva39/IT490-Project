@@ -19,14 +19,14 @@ function requestProcessor($request) {
     switch ($request['type']) {
         case "login":
             $response = validateLogin($request['username'], $request['password']);
-            logAndSendResponse($response);
-            return $response;
+            echo "[DB RABBITMQ] 📬 Sending actual response to Broker: " . json_encode($response) . "\n";
+            error_log("[DB RABBITMQ] 📬 Sending actual response to Broker: " . json_encode($response) . "\n", 3, "/var/log/database_rabbitmq.log");
+            return $response;  // ✅ Ensure actual response is returned!
         default:
-            $response = ["status" => "error", "message" => "Unknown request type"];
-            logAndSendResponse($response);
-            return $response;
+            return ["status" => "error", "message" => "Unknown request type"];
     }
 }
+
 
 // ✅ Validate user login credentials
 function validateLogin($username, $password) {

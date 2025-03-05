@@ -34,9 +34,6 @@ class RabbitMQConnection {
     }
 }
 
-// ✅ Log session details
-error_log("[SESSION] 🔍 Session Started - Session ID: " . session_id());
-
 // ✅ Capture user login attempt
 error_log("[LOGIN] 📩 Request received: " . json_encode($_POST));
 
@@ -54,9 +51,6 @@ if (empty($username) || empty($password)) {
     exit();
 }
 
-// ✅ Log the request before sending it to RabbitMQ
-error_log("[LOGIN] 📤 Sending login request to RabbitMQ Queue: Username='" . $username . "', Password='[HIDDEN]'");
-
 // ✅ Prepare RabbitMQ request
 $request = [
     "type" => "login",
@@ -65,7 +59,6 @@ $request = [
 ];
 
 try {
-    // ✅ Get the persistent RabbitMQ connection to the Broker VM
     $client = RabbitMQConnection::getClient();
     if (!$client) {
         echo json_encode(["status" => "error", "message" => "Could not connect to RabbitMQ"]);
@@ -77,38 +70,28 @@ try {
 
     error_log("[LOGIN] 📬 Received response from RabbitMQ Broker: " . json_encode($response));
 
-    // ✅ Ensure response is valid
-    if (!isset($response['status'])) {
-        echo json_encode(["status" => "error", "message" => "Unexpected response from authentication server"]);
-        exit();
-    }
-
-    // ✅ Handle login responses
     if ($response['status'] === "success") {
-        $_SESSION['username'] = $username;  // ✅ Store in session
+        // ✅ Store session details
+        $_SESSION['username'] = $username;
         $_SESSION['logged_in'] = true;
-
-        error_log("[LOGIN] ✅ User authenticated successfully! Redirecting...");
+        $_SESSION['session_key'] = $response['session_key'];
+        $_SESSION['expires_at'] = $response['expires_at'];
 
         echo json_encode([
             "status" => "success",
             "message" => "Login successful",
             "user_id" => $response['user_id'],
-            "token" => $response['token']
+            "session_key" => $response['session_key']
         ]);
     } else {
-        error_log("[LOGIN] ❌ Login failed: " . $response['message']);
         echo json_encode(["status" => "error", "message" => $response['message']]);
-
         RabbitMQConnection::closeClient();
     }
-
     exit();
 
 } catch (Exception $e) {
     error_log("[LOGIN] ❌ ERROR: RabbitMQ Connection Failed - " . $e->getMessage());
     echo json_encode(["status" => "error", "message" => "Error connecting to RabbitMQ"]);
-
     RabbitMQConnection::closeClient();
     exit();
 }

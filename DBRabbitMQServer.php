@@ -28,7 +28,6 @@ function requestProcessor($request) {
     }
 }
 
-// ✅ Validate user login credentials
 function validateLogin($username, $password) {
     echo "[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n";
     error_log("[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
@@ -42,12 +41,10 @@ function validateLogin($username, $password) {
         return ["status" => "error", "message" => "Database connection failed"];
     }
 
+    // ✅ Fetch hashed password from the database
     $stmt = $db->prepare("SELECT password FROM users WHERE username = ?");
     if (!$stmt) {
-        $errorMsg = "[DB RABBITMQ] ❌ SQL error preparing statement.";
-        echo $errorMsg . "\n";
-        error_log($errorMsg . "\n", 3, "/var/log/database_rabbitmq.log");
-        $db->close();
+        error_log("[DB RABBITMQ] ❌ SQL error preparing statement.\n", 3, "/var/log/database_rabbitmq.log");
         return ["status" => "error", "message" => "Database error"];
     }
 
@@ -65,18 +62,36 @@ function validateLogin($username, $password) {
     $stmt->fetch();
     $stmt->close();
 
-    if (password_verify($password, $hashedPassword)) {
-        $db->close();
-        return [
-            "status" => "success",
-            "message" => "Login successful",
-            "user_id" => $username,
-            "token" => bin2hex(random_bytes(16))
-        ];
-    } else {
+    // ✅ Check if the password is correct
+    if (!password_verify($password, $hashedPassword)) {
         $db->close();
         return ["status" => "error", "message" => "Incorrect password"];
     }
+
+    // ✅ Generate a session key and set expiration time (1 hour)
+    $sessionKey = bin2hex(random_bytes(32));  // 64-character session key
+    $sessionExpiration = date("Y-m-d H:i:s", strtotime("+1 hour"));  // Expire in 1 hour
+
+    // ✅ Store session key in the database
+    $stmt = $db->prepare("UPDATE users SET session_key = ?, session_expires = ? WHERE username = ?");
+    if (!$stmt) {
+        $db->close();
+        return ["status" => "error", "message" => "Failed to create session"];
+    }
+    $stmt->bind_param("sss", $sessionKey, $sessionExpiration, $username);
+    $stmt->execute();
+    $stmt->close();
+    $db->close();
+
+    error_log("[DB RABBITMQ] ✅ Login successful! Session key stored.\n", 3, "/var/log/database_rabbitmq.log");
+
+    return [
+        "status" => "success",
+        "message" => "Login successful",
+        "user_id" => $username,
+        "session_key" => $sessionKey,
+        "expires_at" => $sessionExpiration
+    ];
 }
 
 // ✅ Register New User
@@ -125,7 +140,14 @@ function registerUser($data) {
 }
 
 function logoutUser($data) {
-    $userId = $data['user_id'];
+    if (!isset($data['username'])) {
+        return ["status" => "error", "message" => "Invalid logout request"];
+    }
+
+    $username = $data['username'];
+
+    echo "[DB RABBITMQ] 🔴 Logging out user: " . $username . "\n";
+    error_log("[DB RABBITMQ] 🔴 Logging out user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
 
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
 
@@ -133,13 +155,14 @@ function logoutUser($data) {
         return ["status" => "error", "message" => "Database connection failed"];
     }
 
-    // ✅ Clear session key for the user
+    // ✅ Clear session key and expiration from database
     $stmt = $db->prepare("UPDATE users SET session_key = NULL, session_expires = NULL WHERE username = ?");
     if (!$stmt) {
+        $db->close();
         return ["status" => "error", "message" => "Database error"];
     }
 
-    $stmt->bind_param("s", $userId);
+    $stmt->bind_param("s", $username);
     if ($stmt->execute()) {
         $stmt->close();
         $db->close();

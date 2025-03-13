@@ -3,61 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome</title>
+    <title>News Nexus - Stay Informed</title>
 
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Font Awesome for icons -->
+    <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            fetch("session.php")
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === "success") {
-                        document.getElementById("welcomeUser").textContent = "Welcome, " + data.username + "!";
-                    } else {
-                        window.location.href = "index.html"; // Redirect if not logged in
-                    }
-                })
-                .catch(() => {
-                    window.location.href = "index.html";
-                });
-        });
-
-        function logoutUser() {
-            fetch("logout.php", { method: "POST" })
-                .then(() => {
-                    window.location.href = "index.html"; // Redirect after logout
-                });
+    <style>
+        body {
+            background-color: #f4f7f9;
+            font-family: 'Arial', sans-serif;
         }
-    </script>
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        .navbar {
+            padding: 15px 20px;
+        }
+        .hero-section {
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://source.unsplash.com/1600x900/?news,world') no-repeat center center/cover;
+            color: white;
+            padding: 100px 0;
+            text-align: center;
+        }
+        .hero-title {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+        .hero-subtitle {
+            font-size: 1.5rem;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .hero-btn {
+            margin-top: 20px;
+            font-size: 1.2rem;
+        }
+        .container-news {
+            margin-top: 40px;
+        }
+        .news-card img {
+            height: 200px;
+            object-fit: cover;
+        }
+        .news-card {
+            transition: 0.3s;
+        }
+        .news-card:hover {
+            transform: scale(1.05);
+        }
+        .category-section {
+            margin-top: 50px;
+            padding: 30px 0;
+            background: #fff;
+        }
+        .footer {
+            margin-top: 50px;
+            padding: 20px 0;
+            background: #343a40;
+            color: white;
+            text-align: center;
+        }
+    </style>
 
+    <script>
+        function fetchNews() {
+            fetch("requestNews.php")
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    let newsContainer = document.getElementById("newsContainer");
+                    newsContainer.innerHTML = "";
+                    data.news.forEach(article => {
+                        let articleHTML = `<div class='col-md-4'>
+                            <div class='card news-card shadow-lg'>
+                                <img src="${article.image}" class="card-img-top" alt="News Image">
+                                <div class="card-body">
+                                    <h5 class="card-title">${article.title}</h5>
+                                    <p class="card-text"><strong>Source:</strong> ${article.source}</p>
+                                    <a href="${article.url}" target="_blank" class="btn btn-primary">Read More</a>
+                                </div>
+                            </div>
+                        </div>`;
+                        newsContainer.innerHTML += articleHTML;
+                    });
+                }
+            });
+        }
+
+        window.onload = fetchNews;
+    </script>
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="homepage.html"><i class="fas fa-home"></i> Home</a>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-newspaper"></i> News Nexus
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
-                    <li class="nav-item"><button class="btn btn-danger" onclick="logoutUser()"><i class="fas fa-sign-out-alt"></i> Logout</button></li>
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Trending</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Categories</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">My Feed</a>
+                    </li>
                 </ul>
+                <!-- Profile Dropdown -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle"></i> Account
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#">Settings</a></li>
+                        <li><a class="dropdown-item" href="logout.php">Logout</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-5">
-        <div class="card shadow-lg p-4 text-center">
-            <h2 id="welcomeUser"><i class="fas fa-user"></i> Welcome!</h2>
-            <p class="text-muted">Manage your settings or log out using the navigation above.</p>
+    <!-- Hero Section -->
+    <header class="hero-section">
+        <div class="container">
+            <h1 class="hero-title"><i class="fas fa-globe"></i> Welcome to News Nexus</h1>
+            <p class="hero-subtitle">Your Gateway to Trusted, Personalized News</p>
+            <a href="#" class="btn btn-light hero-btn">Explore News</a>
+        </div>
+    </header>
+
+    <!-- Latest News Section -->
+    <div class="container container-news">
+        <h2 class="text-center mt-4"><i class="fas fa-fire"></i> Latest Headlines</h2>
+        <div class="row mt-3" id="newsContainer">
+            <!-- News Articles Will Load Here -->
         </div>
     </div>
+
+    <!-- Categories Section -->
+    <section class="category-section">
+        <div class="container">
+            <h2 class="text-center"><i class="fas fa-list"></i> Browse by Category</h2>
+            <div class="row text-center mt-4">
+                <div class="col-md-3">
+                    <a href="#" class="btn btn-outline-primary btn-lg w-100">Technology</a>
+                </div>
+                <div class="col-md-3">
+                    <a href="#" class="btn btn-outline-success btn-lg w-100">Health</a>
+                </div>
+                <div class="col-md-3">
+                    <a href="#" class="btn btn-outline-danger btn-lg w-100">Politics</a>
+                </div>
+                <div class="col-md-3">
+                    <a href="#" class="btn btn-outline-warning btn-lg w-100">Sports</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 News Nexus | Your Source for Reliable News</p>
+            <p>
+                <a href="#" class="text-light">Privacy Policy</a> | 
+                <a href="#" class="text-light">Terms of Service</a>
+            </p>
+        </div>
+    </footer>
+
 </body>
 </html>

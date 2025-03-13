@@ -8,45 +8,34 @@ require_once('mysqlconnect.php');
 ini_set("log_errors", 1);
 ini_set("error_log", "/var/log/rabbitmq_errors.log");
 
+// ✅ Process login, registration, and logout
 function requestProcessor($request) {
-    echo "[DB RABBITMQ] 📩 Received request from queue: " . json_encode($request) . "\n";
-    error_log("[DB RABBITMQ] 📩 Received request from queue: " . json_encode($request) . "\n", 3, "/var/log/database_rabbitmq.log");
+    echo "[RABBITMQ VM] 📩 Processing request: " . json_encode($request) . "\n";
+    error_log("[RABBITMQ VM] 📩 Processing request: " . json_encode($request) . "\n", 3, "/var/log/rabbitmq_errors.log");
 
     if (!isset($request['type'])) {
         return ["status" => "error", "message" => "Unsupported request type"];
     }
 
-    switch ($request['type']) {
-        case "login":
-            return validateLogin($request['username'], $request['password']);  // ✅ Ensure function exists
-        case "register":
-            return registerUser($request);
-        case "logout":
-       	    return logoutUser($request);
-        default:
-            return ["status" => "error", "message" => "Unknown request type"];
-    }
+    return match ($request['type']) {
+        "login" => validateLogin($request['username'], $request['password']),
+        "register" => registerUser($request),
+        "logout" => logoutUser($request),
+        default => ["status" => "error", "message" => "Unknown request type"]
+    };
 }
 
+// ✅ Validate user login credentials
 function validateLogin($username, $password) {
-    echo "[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n";
-    error_log("[DB RABBITMQ] 🔍 Checking credentials for user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
-
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
 
     if ($db->connect_errno) {
-        $errorMsg = "[DB RABBITMQ] ❌ Database connection failed: " . $db->connect_error;
-        echo $errorMsg . "\n";
-        error_log($errorMsg . "\n", 3, "/var/log/database_rabbitmq.log");
         return ["status" => "error", "message" => "Database connection failed"];
     }
 
-    // ✅ Fetch hashed password from the database
+    // ✅ Fetch password hash
     $stmt = $db->prepare("SELECT password FROM users WHERE username = ?");
-    if (!$stmt) {
-        error_log("[DB RABBITMQ] ❌ SQL error preparing statement.\n", 3, "/var/log/database_rabbitmq.log");
-        return ["status" => "error", "message" => "Database error"];
-    }
+    if (!$stmt) return ["status" => "error", "message" => "Database error"];
 
     $stmt->bind_param("s", $username);
     $stmt->execute();
@@ -62,28 +51,22 @@ function validateLogin($username, $password) {
     $stmt->fetch();
     $stmt->close();
 
-    // ✅ Check if the password is correct
     if (!password_verify($password, $hashedPassword)) {
         $db->close();
         return ["status" => "error", "message" => "Incorrect password"];
     }
 
-    // ✅ Generate a session key and set expiration time (1 hour)
-    $sessionKey = bin2hex(random_bytes(32));  // 64-character session key
-    $sessionExpiration = date("Y-m-d H:i:s", strtotime("+1 hour"));  // Expire in 1 hour
+    // ✅ Generate and store session key
+    $sessionKey = bin2hex(random_bytes(32));
+    $sessionExpiration = date("Y-m-d H:i:s", strtotime("+1 hour"));
 
-    // ✅ Store session key in the database
     $stmt = $db->prepare("UPDATE users SET session_key = ?, session_expires = ? WHERE username = ?");
-    if (!$stmt) {
-        $db->close();
-        return ["status" => "error", "message" => "Failed to create session"];
-    }
+    if (!$stmt) return ["status" => "error", "message" => "Failed to create session"];
+
     $stmt->bind_param("sss", $sessionKey, $sessionExpiration, $username);
     $stmt->execute();
     $stmt->close();
     $db->close();
-
-    error_log("[DB RABBITMQ] ✅ Login successful! Session key stored.\n", 3, "/var/log/database_rabbitmq.log");
 
     return [
         "status" => "success",
@@ -94,40 +77,30 @@ function validateLogin($username, $password) {
     ];
 }
 
-// ✅ Register New User
+// ✅ Register new user
 function registerUser($data) {
-    $username = $data['username'];
-    $password = $data['password']; // Already hashed before sending
-    $firstName = $data['first_name'];
-    $lastName = $data['last_name'];
-    $dob = $data['dob'];
-
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
 
-    if ($db->connect_errno) {
-        return ["status" => "error", "message" => "Database connection failed"];
-    }
+    if ($db->connect_errno) return ["status" => "error", "message" => "Database connection failed"];
 
-    // ✅ Check if username already exists
     $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
-    $stmt->bind_param("s", $username);
+    $stmt->bind_param("s", $data['username']);
     $stmt->execute();
     $stmt->store_result();
-    
+
     if ($stmt->num_rows > 0) {
         $stmt->close();
         $db->close();
         return ["status" => "error", "message" => "Username already exists"];
     }
+
     $stmt->close();
 
     // ✅ Insert new user
     $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, dob, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-    if (!$stmt) {
-        return ["status" => "error", "message" => "Database error"];
-    }
+    if (!$stmt) return ["status" => "error", "message" => "Database error"];
 
-    $stmt->bind_param("sssss", $username, $password, $firstName, $lastName, $dob);
+    $stmt->bind_param("sssss", $data['username'], $data['password'], $data['first_name'], $data['last_name'], $data['dob']);
     if ($stmt->execute()) {
         $stmt->close();
         $db->close();
@@ -139,30 +112,16 @@ function registerUser($data) {
     }
 }
 
+// ✅ Logout user (clear session key)
 function logoutUser($data) {
-    if (!isset($data['username'])) {
-        return ["status" => "error", "message" => "Invalid logout request"];
-    }
-
-    $username = $data['username'];
-
-    echo "[DB RABBITMQ] 🔴 Logging out user: " . $username . "\n";
-    error_log("[DB RABBITMQ] 🔴 Logging out user: " . $username . "\n", 3, "/var/log/database_rabbitmq.log");
-
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
 
-    if ($db->connect_errno) {
-        return ["status" => "error", "message" => "Database connection failed"];
-    }
+    if ($db->connect_errno) return ["status" => "error", "message" => "Database connection failed"];
 
-    // ✅ Clear session key and expiration from database
     $stmt = $db->prepare("UPDATE users SET session_key = NULL, session_expires = NULL WHERE username = ?");
-    if (!$stmt) {
-        $db->close();
-        return ["status" => "error", "message" => "Database error"];
-    }
+    if (!$stmt) return ["status" => "error", "message" => "Database error"];
 
-    $stmt->bind_param("s", $username);
+    $stmt->bind_param("s", $data['username']);
     if ($stmt->execute()) {
         $stmt->close();
         $db->close();
@@ -174,11 +133,32 @@ function logoutUser($data) {
     }
 }
 
-// ✅ Start RabbitMQ Database Listener
-echo "[DB RABBITMQ] 🚀 Database RabbitMQ Listener is waiting for messages...\n";
-error_log("[DB RABBITMQ] 🚀 Database RabbitMQ Listener is waiting for messages...\n", 3, "/var/log/database_rabbitmq.log");
+// ✅ Start RabbitMQ Servers for `loginQueue` and `registerQueue`
+echo "[RABBITMQ VM] 🚀 RabbitMQ Server is waiting for messages...\n";
+error_log("[RABBITMQ VM] 🚀 RabbitMQ Server is waiting for messages...\n", 3, "/var/log/rabbitmq_errors.log");
 
-$server = new rabbitMQServer("databaseRabbitMQ.ini", "databaseQueue");
-$server->process_requests('requestProcessor');
+$loginServer = new rabbitMQServer("testRabbitMQ.ini", "loginQueue");
+$registerServer = new rabbitMQServer("testRabbitMQ.ini", "registerQueue");
+
+// ✅ Process requests for both queues
+$pid1 = pcntl_fork();
+if ($pid1 == 0) {
+    $loginServer->process_requests("requestProcessor");
+    exit();
+}
+
+$pid2 = pcntl_fork();
+if ($pid2 == 0) {
+    $registerServer->process_requests("requestProcessor");
+    exit();
+}
+
+// ✅ Parent process waits for child processes
+pcntl_wait($status);
+pcntl_wait($status);
+
 exit();
 ?>
+
+
+

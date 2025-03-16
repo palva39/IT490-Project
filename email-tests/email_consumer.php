@@ -24,7 +24,7 @@ function sendEmail($to, $subject, $message) {
 
     if (mail($to, $subject, $message, $headers)) {
         error_log("[EMAIL✅] Email sent to: $to\n", 3, "/var/log/mail.log");
-        echo("[EMAIL📩] Email successfully sent to: $to:\n");
+        echo("[EMAIL✅] Email successfully sent to: $to:\n");
         return ["status" => "success", "message" => "Email sent"];
     } else {
         error_log("[EMAIL❌] Email failed for: $to\n", 3, "/var/log/mail.log");

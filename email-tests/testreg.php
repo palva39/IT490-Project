@@ -3,12 +3,15 @@ require_once('rabbitMQLib.inc');
 
 $client = new rabbitMQClient("testRabbitMQ.ini", "registerQueue");
 
-$request = [
-    "type" => "register",
-    "username" => "testuser",
-    "email" => "test@example.com",
-    "password" => password_hash("password123", PASSWORD_DEFAULT)
-];
+  $request = [
+        "type" => "register",
+        "username" => "testuser",
+        "password" => password_hash("password123", PASSWORD_DEFAULT),
+        "first_name" => "Test",
+        "last_name" => "User",
+        "dob" => "2000-01-01", // Format: YYYY-MM-DD
+        "email" => "test@example.com"
+    ];
 
 // Send test registration request(hopefully this works)
 $response = $client->send_request($request);

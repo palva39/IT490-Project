@@ -1,7 +1,7 @@
 <?php
 require_once('rabbitMQLib.inc');
 
-$client = new rabbitMQClient("testRabbitMQ.ini", "testServer");
+$client = new rabbitMQClient("testRabbitMQ.ini", "registerQueue");
 
 $request = [
     "type" => "register",

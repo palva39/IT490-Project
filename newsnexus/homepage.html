@@ -1,191 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>News Nexus - Stay Informed</title>
 
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+    />
 
     <style>
-        body {
-            background-color: #f4f7f9;
-            font-family: 'Arial', sans-serif;
-        }
-        .navbar-brand {
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
-        .navbar {
-            padding: 15px 20px;
-        }
-        .hero-section {
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://source.unsplash.com/1600x900/?news,world') no-repeat center center/cover;
-            color: white;
-            padding: 100px 0;
-            text-align: center;
-        }
-        .hero-title {
-            font-size: 3rem;
-            font-weight: bold;
-        }
-        .hero-subtitle {
-            font-size: 1.5rem;
-            margin-top: 10px;
-            opacity: 0.9;
-        }
-        .hero-btn {
-            margin-top: 20px;
-            font-size: 1.2rem;
-        }
-        .container-news {
-            margin-top: 40px;
-        }
-        .news-card img {
-            height: 200px;
-            object-fit: cover;
-        }
-        .news-card {
-            transition: 0.3s;
-        }
-        .news-card:hover {
-            transform: scale(1.05);
-        }
-        .category-section {
-            margin-top: 50px;
-            padding: 30px 0;
-            background: #fff;
-        }
-        .footer {
-            margin-top: 50px;
-            padding: 20px 0;
-            background: #343a40;
-            color: white;
-            text-align: center;
-        }
+      body {
+        background-color: #f4f7f9;
+        font-family: "Arial", sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .content {
+        flex: 1;
+      }
+      .navbar-brand {
+        font-size: 1.8rem;
+        font-weight: bold;
+      }
+      .navbar {
+        padding: 15px 20px;
+      }
+      .hero-section {
+        background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+          url("https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=1600&h=900&fit=crop")
+            no-repeat center center/cover;
+        color: white;
+        padding: 80px 0;
+        text-align: center;
+      }
+      .hero-title {
+        font-size: 3rem;
+        font-weight: bold;
+      }
+      .hero-subtitle {
+        font-size: 1.5rem;
+        margin-top: 10px;
+        opacity: 0.9;
+      }
+      .search-section {
+        background: #fff;
+        padding: 30px;
+        margin: 30px auto;
+        border-radius: 10px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        width: 80%;
+      }
+      .search-bar {
+        width: 60%;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 1rem;
+      }
+      .search-select {
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 1rem;
+        margin-left: 10px;
+      }
+      .search-btn {
+        margin-left: 10px;
+        padding: 10px 20px;
+        font-size: 1rem;
+      }
+      .container-news {
+        margin-top: 40px;
+      }
+      .news-card {
+        margin-bottom: 20px;
+      }
+      .news-card img {
+        height: 200px;
+        object-fit: cover;
+      }
+      .footer {
+        padding: 20px 0;
+        background: #343a40;
+        color: white;
+        text-align: center;
+        margin-top: auto;
+      }
     </style>
 
     <script>
-        function fetchNews() {
-            fetch("requestNews.php")
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === "success") {
-                    let newsContainer = document.getElementById("newsContainer");
-                    newsContainer.innerHTML = "";
-                    data.news.forEach(article => {
-                        let articleHTML = `<div class='col-md-4'>
-                            <div class='card news-card shadow-lg'>
-                                <img src="${article.image}" class="card-img-top" alt="News Image">
-                                <div class="card-body">
-                                    <h5 class="card-title">${article.title}</h5>
-                                    <p class="card-text"><strong>Source:</strong> ${article.source}</p>
-                                    <a href="${article.url}" target="_blank" class="btn btn-primary">Read More</a>
-                                </div>
-                            </div>
-                        </div>`;
-                        newsContainer.innerHTML += articleHTML;
-                    });
-                }
-            });
+      function checkSession() {
+        fetch("session_check.php")
+          .then((response) => response.json())
+          .then((data) => {
+            let navbarRight = document.getElementById("navbarRight");
+
+            if (data.loggedIn) {
+              navbarRight.innerHTML = `
+                        <div class="dropdown">
+                            <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user-circle"></i> ${data.username}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#">Settings</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="logoutUser()">Logout</a></li>
+                            </ul>
+                        </div>
+                    `;
+            } else {
+              navbarRight.innerHTML = `<a href="/" class="btn btn-success">Login</a>`;
+            }
+          })
+          .catch((error) => console.error("Session check failed:", error));
+      }
+
+      function logoutUser() {
+        fetch("logout.php", { method: "POST" })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.status === "success") {
+              console.log("User logged out successfully.");
+
+              // Clear all session storage and local storage
+              sessionStorage.clear();
+              localStorage.clear();
+
+              // Redirect to login page
+              window.location.href = "index.html";
+            }
+          })
+          .catch((error) => console.error("Logout failed:", error));
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        checkSession(); // Ensures login/logout is checked after the page loads
+
+        // Assign event listener to button instead of inline onclick
+        const searchButton = document.getElementById("search-button");
+        if (searchButton) {
+          searchButton.addEventListener("click", fetchNews);
+        }
+      });
+
+      function fetchNews() {
+        const query = document.getElementById("search-query").value.trim();
+        if (!query) {
+          alert("Please enter a search term.");
+          return;
         }
 
-        window.onload = fetchNews;
-    </script>
-</head>
-<body>
+        let url = `/news_proxy.php?q=${encodeURIComponent(query)}`;
 
-    <!-- Navigation Bar -->
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("API Response:", data);
+            const newsContainer = document.getElementById("newsContainer");
+            newsContainer.innerHTML = "";
+
+            if (data.articles && data.articles.length > 0) {
+              data.articles.forEach((article) => {
+                const newsItem = document.createElement("div");
+                newsItem.className = "col-md-4";
+                newsItem.innerHTML = `
+                    <div class='card news-card shadow-lg'>
+                        <img src="${
+                          article.urlToImage ||
+                          "https://via.placeholder.com/150"
+                        }" class="card-img-top" alt="News Image">
+                        <div class="card-body">
+                            <h5 class="card-title">${article.title}</h5>
+                            <p class="card-text">${
+                              article.description || "No description available"
+                            }</p>
+                            <a href="${
+                              article.url
+                            }" target="_blank" class="btn btn-primary">Read More</a>
+                        </div>
+                    </div>
+                `;
+                newsContainer.appendChild(newsItem);
+              });
+            } else {
+              newsContainer.innerHTML = `<p>No articles found for "${query}".</p>`;
+            }
+          })
+          .catch((error) => console.error("Error fetching news:", error));
+      }
+
+      window.onload = checkSession;
+    </script>
+  </head>
+  <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-newspaper"></i> News Nexus
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mx-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Trending</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Categories</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">My Feed</a>
-                    </li>
-                </ul>
-                <!-- Profile Dropdown -->
-                <div class="dropdown">
-                    <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle"></i> Account
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#">Settings</a></li>
-                        <li><a class="dropdown-item" href="logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
+      <div class="container">
+        <a class="navbar-brand" href="#"
+          ><i class="fas fa-newspaper"></i> News Nexus</a
+        >
+        <div class="collapse navbar-collapse">
+          <ul class="navbar-nav mx-auto">
+            <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Trending</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">Categories</a>
+            </li>
+          </ul>
+          <div id="navbarRight"></div>
         </div>
+      </div>
     </nav>
 
-    <!-- Hero Section -->
     <header class="hero-section">
-        <div class="container">
-            <h1 class="hero-title"><i class="fas fa-globe"></i> Welcome to News Nexus</h1>
-            <p class="hero-subtitle">Your Gateway to Trusted, Personalized News</p>
-            <a href="#" class="btn btn-light hero-btn">Explore News</a>
-        </div>
+      <div class="container">
+        <h1 class="hero-title">
+          <i class="fas fa-globe"></i> Welcome to News Nexus
+        </h1>
+        <p class="hero-subtitle">Your Gateway to Trusted, Personalized News</p>
+      </div>
     </header>
 
-    <!-- Latest News Section -->
-    <div class="container container-news">
-        <h2 class="text-center mt-4"><i class="fas fa-fire"></i> Latest Headlines</h2>
-        <div class="row mt-3" id="newsContainer">
-            <!-- News Articles Will Load Here -->
-        </div>
+    <div class="container search-section">
+      <h3>Search for News</h3>
+      <input
+        id="search-query"
+        type="text"
+        class="search-bar"
+        placeholder="Enter a search term..."
+      />
+      <button class="btn btn-primary search-btn" onclick="fetchNews()">
+        Search
+      </button>
     </div>
 
-    <!-- Categories Section -->
-    <section class="category-section">
-        <div class="container">
-            <h2 class="text-center"><i class="fas fa-list"></i> Browse by Category</h2>
-            <div class="row text-center mt-4">
-                <div class="col-md-3">
-                    <a href="#" class="btn btn-outline-primary btn-lg w-100">Technology</a>
-                </div>
-                <div class="col-md-3">
-                    <a href="#" class="btn btn-outline-success btn-lg w-100">Health</a>
-                </div>
-                <div class="col-md-3">
-                    <a href="#" class="btn btn-outline-danger btn-lg w-100">Politics</a>
-                </div>
-                <div class="col-md-3">
-                    <a href="#" class="btn btn-outline-warning btn-lg w-100">Sports</a>
-                </div>
-            </div>
-        </div>
-    </section>
+    <div class="container container-news">
+      <div class="row mt-3" id="newsContainer"></div>
+    </div>
 
-    <!-- Footer -->
     <footer class="footer">
-        <div class="container">
-            <p>&copy; 2025 News Nexus | Your Source for Reliable News</p>
-            <p>
-                <a href="#" class="text-light">Privacy Policy</a> | 
-                <a href="#" class="text-light">Terms of Service</a>
-            </p>
-        </div>
+      <p>&copy; 2025 News Nexus | Your Source for Reliable News</p>
     </footer>
-
-</body>
+  </body>
 </html>

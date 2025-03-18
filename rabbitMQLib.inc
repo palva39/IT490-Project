@@ -168,7 +168,7 @@ class rabbitMQClient {
         $reply_queue_name = $this->queue . "_response";  // Example: loginQueue_response
         $reply_queue = new AMQPQueue($this->channel);
         $reply_queue->setName($reply_queue_name);
-        $this->queueObj->declareQueue(); // changed connection method
+        $reply_queue->declare();
         $reply_queue->bind($this->exchangeObj->getName(), $reply_queue_name);
 
         // ✅ Publish the message with `reply_to` set to the response queue

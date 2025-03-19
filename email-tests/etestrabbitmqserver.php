@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/php 
 <?php
 require_once('path.inc');
 require_once('get_host_info.inc');
@@ -146,7 +146,6 @@ function sendWelcomeEmail($email, $first_name) {
     }
 }
 
-
 // ✅ Logout user (clear session key)
 function logoutUser($data) {
     $db = new mysqli("127.0.0.1", "testUser", "12345", "login");
@@ -175,24 +174,21 @@ error_log("[RABBITMQ VM] 🚀 RabbitMQ Server is waiting for messages...\n", 3, 
 $loginServer = new rabbitMQServer("testRabbitMQ.ini", "loginQueue");
 $registerServer = new rabbitMQServer("testRabbitMQ.ini", "registerQueue");
 
-// ✅ Process requests for both queues
+// ✅ Process requests for both queues in child processes
 $pid1 = pcntl_fork();
 if ($pid1 == 0) {
     $loginServer->process_requests("requestProcessor");
-    exit();
+    exit(0);  // ✅ Child exits after processing
 }
 
 $pid2 = pcntl_fork();
 if ($pid2 == 0) {
     $registerServer->process_requests("requestProcessor");
-    exit();
+    exit(0);  // ✅ Child exits after processing
 }
 
-// ✅ Parent process waits for child processes
-pcntl_wait($status);
-pcntl_wait($status);
-
-exit();
-?>
-
-
+// ✅ Parent process keeps running indefinitely
+while (true) {
+    pcntl_wait($status);
+    sleep(1); // ✅ Prevent high CPU usage
+}
